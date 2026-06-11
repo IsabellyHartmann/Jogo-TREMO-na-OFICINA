@@ -43,9 +43,9 @@ export default function GestureModel({ letraAlvo, onLetraIdentificada }) {
         const ctx = canvas.getContext('2d');
         ctx.clearRect(0, 0, canvas.width, canvas.height);
 
-        // CORREÇÃO: Aceder corretamente à primeira mão detetada [0] dentro do array
+        // CORREÇÃO: Extrair o primeiro elemento da matriz de coordenadas reais da mão detectada
         if (resultado.handLandmarks && resultado.handLandmarks.length > 0) {
-            const pontosMao = resultado.handLandmarks[0]; 
+            const pontosMao = resultado.handLandmarks[0];
             desenharEsqueletoNoCanvas(ctx, pontosMao);
 
             // Executa o algoritmo matemático de validação local
@@ -55,30 +55,31 @@ export default function GestureModel({ letraAlvo, onLetraIdentificada }) {
         }
     };
 
-    // 3. Algoritmo de Classificação do Alfabeto Manual LGP (Baseado nos 21 Landmarks)
+    // 3. Algoritmo de Classificação do Alfabeto Manual LGP baseado nos 21 pontos do esqueleto
     const validarGestoLGP = (pontos, letra) => {
-        if (!pontos || pontos.length !== 21) return false;
+        if (!pontos || pontos.length < 21) return false;
 
+        // Compara a ponta de cada dedo com a sua respetiva junta inferior no eixo Y
         const indicadorAberto = pontos[8].y < pontos[6].y;
         const medioAberto = pontos[12].y < pontos[10].y;
         const anelarAberto = pontos[16].y < pontos[14].y;
         const mindinhoAberto = pontos[20].y < pontos[18].y;
 
         if (letra === 'A') {
-            // Letra A em LGP: Mão fechada (todos os dedos recolhidos para baixo)
+            // Letra A (LGP): Mão totalmente fechada (todos os dedos recolhidos para baixo)
             return !indicadorAberto && !medioAberto && !anelarAberto && !mindinhoAberto;
         }
         if (letra === 'O') {
-            // Simulação de transição para o formato em 'O' (dedos ligeiramente curvados)
+            // Letra O (LGP): Formato curvado de pinça (as pontas dos dedos descem)
             return pontos[8].y > pontos[5].y && pontos[4].y > pontos[1].y;
         }
-        
-        // Salvaguarda de desenvolvimento para as restantes letras (passa automaticamente com a mão visível)
+
+        // Salvaguarda para as restantes letras (passa automaticamente com qualquer mão detetada)
         return pontos.length === 21;
     };
 
     const desenharEsqueletoNoCanvas = (ctx, pontos) => {
-        ctx.fillStyle = "#00ff00"; // Nós dos dedos a verde brilhante de oficina
+        ctx.fillStyle = "#00ff00"; // Nós dos dedos a verde brilhante
         ctx.strokeStyle = "#ffcc00"; // Ligações do esqueleto a amarelo industrial
         ctx.lineWidth = 3;
         pontos.forEach(p => {
@@ -89,9 +90,9 @@ export default function GestureModel({ letraAlvo, onLetraIdentificada }) {
     };
 
     return (
-        <div style={{ position: 'relative', width: '400px', margin: '0 auto' }}>
+        <div style={{ position: 'relative', width: '400px', height: '320px', margin: '0 auto' }}>
             {carregandoIA && (
-                <p style={{ color: '#ff9800', fontWeight: 'bold' }}>
+                <p style={{ color: '#ffcc00', fontWeight: 'bold', background: '#111', padding: '10px', borderRadius: '5px' }}>
                     🔧 A ligar motores de IA Oficinal Stand-Alone...
                 </p>
             )}
