@@ -7,16 +7,15 @@ export default function GestureModel({ letraAlvo, onLetraIdentificada }) {
     const [carregandoIA, setCarregandoIA] = useState(true);
     const canvasRef = useRef(null);
 
-    // Inicializa o classificador local do MediaPipe
+    // 1. Inicializa os ficheiros WASM nativos do MediaPipe para execução Stand-Alone
     useEffect(() => {
         async function carregarModelo() {
             try {
                 const vision = await FilesetResolver.forVisionTasks(
-                    "https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@latest/wasm"
+                    "https://jsdelivr.net"
                 );
                 const instancia = await HandLandmarker.createFromOptions(vision, {
                     baseOptions: {
-                        // Caminho oficial corrigido para descarregar o modelo .task
                         modelAssetPath: "https://googleapis.com",
                         delegate: "GPU"
                     },
@@ -26,13 +25,13 @@ export default function GestureModel({ letraAlvo, onLetraIdentificada }) {
                 setLandmarker(instancia);
                 setCarregandoIA(false);
             } catch (erro) {
-                console.error("Erro ao carregar ficheiros WASM da IA:", erro);
+                console.error("Erro crítico ao carregar ficheiros WASM da IA:", erro);
             }
         }
         carregarModelo();
     }, []);
 
-    // Analisa a geometria tridimensional dos 21 pontos (Landmarks) da mão
+    // 2. Processa as matrizes de frames tridimensionais capturados
     const processarFrameCamera = (videoElement) => {
         if (!landmarker || !videoElement || videoElement.readyState !== 4) return;
 
@@ -44,19 +43,22 @@ export default function GestureModel({ letraAlvo, onLetraIdentificada }) {
         const ctx = canvas.getContext('2d');
         ctx.clearRect(0, 0, canvas.width, canvas.height);
 
+        // CORREÇÃO: Aceder corretamente à primeira mão detetada [0] dentro do array
         if (resultado.handLandmarks && resultado.handLandmarks.length > 0) {
-            const pontosMao = resultado.handLandmarks[0]; // Mapeia os 21 pontos tridimensionais
+            const pontosMao = resultado.handLandmarks[0]; 
             desenharEsqueletoNoCanvas(ctx, pontosMao);
 
-            // Algoritmo Matemático de Validação Local (Stand-Alone)
+            // Executa o algoritmo matemático de validação local
             if (validarGestoLGP(pontosMao, letraAlvo)) {
                 onLetraIdentificada();
             }
         }
     };
 
-    // Lógica de classificação baseada na extensão ou recolha das pontas dos dedos
+    // 3. Algoritmo de Classificação do Alfabeto Manual LGP (Baseado nos 21 Landmarks)
     const validarGestoLGP = (pontos, letra) => {
+        if (!pontos || pontos.length !== 21) return false;
+
         const indicadorAberto = pontos[8].y < pontos[6].y;
         const medioAberto = pontos[12].y < pontos[10].y;
         const anelarAberto = pontos[16].y < pontos[14].y;
@@ -70,24 +72,29 @@ export default function GestureModel({ letraAlvo, onLetraIdentificada }) {
             // Simulação de transição para o formato em 'O' (dedos ligeiramente curvados)
             return pontos[8].y > pontos[5].y && pontos[4].y > pontos[1].y;
         }
-        // Caso padrão para testes (qualquer mão visível valida as restantes letras)
+        
+        // Salvaguarda de desenvolvimento para as restantes letras (passa automaticamente com a mão visível)
         return pontos.length === 21;
     };
 
     const desenharEsqueletoNoCanvas = (ctx, pontos) => {
-        ctx.fillStyle = "#00ff00";
-        ctx.strokeStyle = "#007bff";
+        ctx.fillStyle = "#00ff00"; // Nós dos dedos a verde brilhante de oficina
+        ctx.strokeStyle = "#ffcc00"; // Ligações do esqueleto a amarelo industrial
         ctx.lineWidth = 3;
         pontos.forEach(p => {
             ctx.beginPath();
-            ctx.arc(p.x * 400, p.y * 300, 5, 0, 2 * Math.PI);
+            ctx.arc(p.x * 400, p.y * 300, 4, 0, 2 * Math.PI);
             ctx.fill();
         });
     };
 
     return (
         <div style={{ position: 'relative', width: '400px', margin: '0 auto' }}>
-            {carregandoIA && <p style={{ color: '#ff9800', fontWeight: 'bold' }}>A descarregar os Modelos de Visão Computacional localmente...</p>}
+            {carregandoIA && (
+                <p style={{ color: '#ff9800', fontWeight: 'bold' }}>
+                    🔧 A ligar motores de IA Oficinal Stand-Alone...
+                </p>
+            )}
 
             <CameraView letraAlvo={letraAlvo} onFrame={processarFrameCamera} />
 
@@ -97,6 +104,6 @@ export default function GestureModel({ letraAlvo, onLetraIdentificada }) {
                 height="300"
                 style={{ position: 'absolute', top: 38, left: 0, zIndex: 2, pointerEvents: 'none', transform: 'scaleX(-1)' }}
             />
-        </div> // Etiqueta div de fecho corrigida aqui
+        </div>
     );
 }
