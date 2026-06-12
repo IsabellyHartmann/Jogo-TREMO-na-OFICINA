@@ -144,22 +144,17 @@ export default function CameraView({ letraAlvo, onFrame }) {
 
 
 
-
-
-
 import React, { useRef, useEffect, useState } from 'react';
 
 export default function CameraView({ letraAlvo, onFrame, children }) {
     const videoRef = useRef(null);
-    const [status, setStatus] = useState("A iniciar câmara...");
+    const [status, setStatus] = useState("A iniciar câmara no iPhone...");
     const onFrameRef = useRef(onFrame);
 
-    // Mantém a função de processamento atualizada sem quebrar o loop
     useEffect(() => {
         onFrameRef.current = onFrame;
     }, [onFrame]);
 
-    // Atualiza o texto do status sempre que a letra alvo mudar
     useEffect(() => {
         if (videoRef.current && videoRef.current.srcObject) {
             setStatus(`Faça o gesto para a letra: ${letraAlvo}`);
@@ -173,11 +168,15 @@ export default function CameraView({ letraAlvo, onFrame, children }) {
 
         async function iniciarVideo() {
             try {
+                // Configuração ideal e leve para câmaras de telemóveis
                 const stream = await navigator.mediaDevices.getUserMedia({
-                    video: { width: 400, height: 300, facingMode: "user" }
+                    video: {
+                        width: { ideal: 640 },
+                        height: { ideal: 480 },
+                        facingMode: "user"
+                    }
                 });
-                
-                // SE O REACT JÁ DESMONTOU O COMPONENTE (STRICT MODE), MATA O FLUXO IMEDIATAMENTE
+
                 if (!ativo) {
                     stream.getTracks().forEach(track => track.stop());
                     return;
@@ -186,9 +185,16 @@ export default function CameraView({ letraAlvo, onFrame, children }) {
                 streamLocal = stream;
                 if (videoRef.current) {
                     videoRef.current.srcObject = stream;
+
+                    // CRUCIAL PARA IPHONE: Forçar o arranque do play via código
+                    try {
+                        await videoRef.current.play();
+                    } catch (e) {
+                        console.log("A aguardar toque do utilizador para iniciar vídeo.");
+                    }
+
                     setStatus(`Faça o gesto para a letra: ${letraAlvo}`);
 
-                    // Loop contínuo e estável de captura
                     const loop = () => {
                         if (videoRef.current && videoRef.current.readyState === 4 && ativo) {
                             onFrameRef.current(videoRef.current);
@@ -201,15 +207,14 @@ export default function CameraView({ letraAlvo, onFrame, children }) {
                 }
             } catch (err) {
                 if (ativo) {
-                    console.error("Erro ao aceder à câmara:", err);
-                    setStatus("Erro: Câmara ocupada ou bloqueada. Certifique-se de que fechou outras abas.");
+                    console.error("Erro na câmara do iPhone:", err);
+                    setStatus(`Erro: ${err.name === 'NotAllowedError' ? 'Permita o acesso à câmara no iOS.' : err.message}`);
                 }
             }
         }
 
         iniciarVideo();
 
-        // Limpeza real quando o componente sai do ecrã
         return () => {
             ativo = false;
             cancelAnimationFrame(idAnimacao);
@@ -217,14 +222,17 @@ export default function CameraView({ letraAlvo, onFrame, children }) {
                 streamLocal.getTracks().forEach(track => track.stop());
             }
         };
-    }, []); 
+    }, []);
 
     return (
         <div style={{ textAlign: 'center' }}>
-            <p style={{ fontWeight: 'bold', margin: '8px 0', color: '#ffcc00' }}>{status}</p>
-            
-            {/* Container Relativo que une o vídeo e o esqueleto no mesmo espaço exato */}
-            <div style={{ position: 'relative', width: '400px', height: '300px', margin: '0 auto' }}>
+            <p style={{ fontWeight: 'bold', margin: '8px 0', color: '#ffcc00', fontSize: '14px' }}>{status}</p>
+
+            {/* Se o iPhone bloquear o autoplay, um toque aqui força o início */}
+            <div
+                onClick={() => videoRef.current && videoRef.current.play()}
+                style={{ position: 'relative', width: '400px', height: '300px', margin: '0 auto', cursor: 'pointer' }}
+            >
                 <video
                     ref={videoRef}
                     autoPlay
@@ -232,17 +240,18 @@ export default function CameraView({ letraAlvo, onFrame, children }) {
                     muted
                     width="400"
                     height="300"
-                    style={{ 
-                        borderRadius: '12px', 
-                        transform: 'scaleX(-1)', 
-                        border: '4px solid #333', 
+                    style={{
+                        borderRadius: '12px',
+                        transform: 'scaleX(-1)',
+                        border: '4px solid #333',
                         backgroundColor: '#000',
-                        display: 'block' 
+                        display: 'block',
+                        objectFit: 'cover'
                     }}
                 />
-                {/* O canvas do esqueleto vai ser renderizado aqui dentro */}
                 {children}
             </div>
+            <p style={{ fontSize: '10px', color: '#666', marginTop: '4px' }}>Se a imagem congelar, dá um toque no quadrado do vídeo.</p>
         </div>
     );
 }
